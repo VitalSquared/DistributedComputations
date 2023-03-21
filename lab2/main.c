@@ -188,7 +188,7 @@ void *receiver(void *param)
 
             max_timestamp = MAX(max_timestamp, recv_timestamp);
 
-            if (recv_timestamp > timestamp || (recv_timestamp == timestamp && source < mpi_rank))
+            if (recv_timestamp > timestamp || (recv_timestamp == timestamp && source > mpi_rank))
                 my_request->num_procs_replied++;
             else
                 my_request->needs_new_request = TRUE;
