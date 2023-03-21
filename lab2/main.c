@@ -139,11 +139,11 @@ void *receiver(void *param)
         if (source == mpi_rank)
             continue;
 
-        max_timestamp = MAX(max_timestamp, recv_timestamp);
-
         if (tag == RELEASE)
         {
             pthread_mutex_lock(&mutex);
+
+            max_timestamp = MAX(max_timestamp, recv_timestamp);
 
             queue_remove(request_queue, all_entries[source]);
 
@@ -163,12 +163,15 @@ void *receiver(void *param)
             entry_t *entry = all_entries[source];
             entry->timestamp = recv_timestamp;
 
+            pthread_mutex_lock(&mutex);
+
+            max_timestamp = MAX(max_timestamp, recv_timestamp);
             if (tag == REQUEST)
             {
-                pthread_mutex_lock(&mutex);
                 queue_add(request_queue, entry);
-                pthread_mutex_unlock(&mutex);
             }
+
+            pthread_mutex_unlock(&mutex);
 
             clock_t msg = timestamp;
             MPI_Request request;
@@ -180,7 +183,9 @@ void *receiver(void *param)
 
             pthread_mutex_lock(&mutex);
 
-            if (recv_timestamp > timestamp)
+            max_timestamp = MAX(max_timestamp, recv_timestamp);
+
+            if (recv_timestamp > timestamp || (recv_timestamp == timestamp && source < mpi_rank))
                 my_request->num_procs_replied++;
             else
                 my_request->needs_new_request = TRUE;
@@ -233,7 +238,7 @@ int init()
     my_request->needs_new_request = TRUE;
     my_request->num_procs_replied = 0;
 
-    timestamp = mpi_rank;
+    //timestamp = mpi_rank;
     return 0;
 }
 
@@ -266,28 +271,6 @@ void lock_print()
     {
         pthread_cond_wait(&cond, &mutex);
     }
-
-    /*if (!my_request->can_lock)
-    {
-        queue_remove(request_queue, my_request);
-
-        pthread_mutex_unlock(&mutex);
-
-
-        for (int i = 0; i < mpi_size; i++)
-        {
-            if (i == mpi_rank)
-                continue;
-
-            MPI_Isend(&msg, 1, MPI_LONG, i, RELEASE, MPI_COMM_WORLD, &requests[i]);
-            //MPI_Send(&msg, 1, MPI_INT, i, RELEASE, MPI_COMM_WORLD);
-        }
-
-        if (DEBUG)
-            fprintf(stderr, "%d - release request (unsuccessful lock)\n", mpi_rank);
-
-        return;
-    }*/
 
     pthread_mutex_unlock(&mutex);
 }
@@ -337,7 +320,7 @@ int main(int argc, char **argv)
     {
         lock_print();
         printf("Message from %d\n", mpi_rank);
-        usleep(10000);
+        //usleep(10000);
         unlock_print();
     }
 
