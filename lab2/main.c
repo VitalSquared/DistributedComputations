@@ -113,14 +113,17 @@ void queue_remove(queue_t *queue, entry_t *entry)
 
 void send_message_to_other_procs(int tag, long msg)
 {
-    MPI_Request requests[mpi_size];
+    MPI_Request requests[mpi_size - 1];
     for (int i = 0; i < mpi_size; i++)
     {
-        if (i == mpi_rank)
+        if (i == mpi_rank) {
             continue;
-
-        MPI_Isend(&msg, 1, MPI_LONG, i, tag, MPI_COMM_WORLD, &requests[i]);
+        }
+        int sub = i > mpi_rank ? 1 : 0;
+        MPI_Isend(&msg, 1, MPI_LONG, i, tag, MPI_COMM_WORLD, &requests[i - sub]);
     }
+    MPI_Status statuses[mpi_size - 1];
+    MPI_Waitall(mpi_size - 1, requests, statuses);
 }
 
 void *receiver(void *param)
@@ -320,6 +323,7 @@ int main(int argc, char **argv)
     {
         lock_print();
         printf("Message from %d\n", mpi_rank);
+        fflush(stdout);
         //usleep(10000);
         unlock_print();
     }
